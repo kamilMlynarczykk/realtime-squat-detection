@@ -1,9 +1,11 @@
+import json
 import time
 import re
 import cv2
 import mediapipe as mp
 import numpy as np
-import speech_recognition as sr
+import pyaudio
+from vosk import Model, KaldiRecognizer
 import threading
 
 mp_drawing = mp.solutions.drawing_utils
@@ -31,15 +33,17 @@ KEY_POINTS_SIDE = [
     mp_pose.PoseLandmark.LEFT_FOOT_INDEX
 ]
 
-# indexes of cameras and microphone, use helper function down below to list them
+# cameras
 front_camera = 0
 side_camera = 1
-microphone = 0
+microphone = 3
 
 # cv2 text params
 line_thickness = 2
 font_scale = 1
 
+# path to offline model
+model_path = "{DIRECTORY_WITH_VOSK_MODELS}\\{VOSK-MODEL}}"  #for example: "Offline-Vosk-Models\\vosk-model-small-en-us-0.15"
 
 class SquatCounterApp:
     def __init__(self):
@@ -321,57 +325,70 @@ class SquatCounterApp:
         rectangle[:] = (0, 0, 0)
         return np.hstack((image, rectangle))
 
-    def listen_for_command(self):
-        recognizer = sr.Recognizer()
-        #try:
-        #    # Initialize the microphone
-        #    microphone_source = sr.Microphone(microphone)
-        #    print(f"Microphone initialized with index")
-        #except Exception as e:
-        #    print(f"Error initializing microphone: {e}")
-        #    return
-        microphone_source = sr.Microphone(microphone)
+    def stop_audio_input(self, stream, mic_source):
+        stream.stop_stream()
+        stream.close()
+        mic_source.terminate()
 
+
+    def listen_for_command(self):
+
+        print("Initializing model...")
+        model = Model(model_path)
+        recognizer = KaldiRecognizer(model, 16000)
+
+        try:
+            # Initialize the microphone
+            microphone_source = pyaudio.PyAudio()
+            stream = microphone_source.open(format=pyaudio.paInt16,channels=1, rate=16000, input=True, frames_per_buffer=8192, input_device_index=3)
+            print(f"Microphone initialized")
+        except Exception as e:
+            print(f"Error initializing microphone: {e}")
+            return
+
+        # Terminate the PyAudio object
+        print("Listening...")
         while True:
             try:
-                with microphone_source as source:
-                    recognizer.adjust_for_ambient_noise(source)
-                    print("Listening...")
-                    audio = recognizer.listen(source)
-                    self.command = recognizer.recognize_google(audio).lower()
-                    print(f"Heard command: {self.command}")
+                audio = stream.read(2048)
+                if recognizer.AcceptWaveform(audio):
+                    result = json.loads(recognizer.Result())
+                    self.command = result['text']
+                else:
+                    continue
+                print(f"Heard command: {self.command}")
 
-                    if 'start workout' in self.command:
-                        if 'start workout' in self.command:
-                            self.wrongCommand = False
-                            # Extract the number of squats from the command
-                            match = re.search(r'start workout (\d+) squats', self.command)
-                            if match:
-                                self.no_number_in_command = False
-                                self.squats_todo = int(match.group(1))
-                                self.start_speech_command_received = True
-                                break
-                            else:
-                                self.no_number_in_command = True  # Default to 10 squats if no number specified
-                                self.start_speech_command_received = False
-                    elif 'repeat workout' in self.command:
-                        self.wrongCommand = False
-                        print("Repeat workout command received.")
-                        self.restart_workout()
-                        break
-                    elif 'stop workout' in self.command:
-                        self.wrongCommand = False
-                        self.stop_speech_command_received = True
+                if 'start work out' in self.command:
+                    self.wrongCommand = False
+                    # Extract the number of squats from the command
+                    match = re.search(r'start work out (\d+) squats', self.command)
+                    print(match)
+                    if match:
+                        self.no_number_in_command = False
+                        self.squats_todo = int(match.group(1))
+                        print(self.squats_todo)
+                        self.start_speech_command_received = True
+                        self.stop_audio_input(stream, microphone_source)
                         break
                     else:
-                        self.wrongCommand = True
-                    print(self.wrongCommand)
+                        self.no_number_in_command = True
+                        self.start_speech_command_received = False
+                elif 'repeat work out' in self.command:
+                    self.wrongCommand = False
+                    print("Repeat workout command received.")
+                    self.restart_workout()
+                    self.stop_audio_input(stream, microphone_source)
+                    break
+                elif 'stop work out' in self.command:
+                    self.wrongCommand = False
+                    self.stop_speech_command_received = True
+                    self.stop_audio_input(stream, microphone_source)
+                    break
+                else:
+                    self.wrongCommand = True
+                print(self.wrongCommand)
 
-            except sr.UnknownValueError:
-                pass
-            except sr.RequestError as e:
-                print(f"Speech recognition error: {e}")
-                break
+
             except Exception as e:
                 print(e)
 
@@ -504,8 +521,13 @@ class SquatCounterApp:
 
 
 def list_microphones():
-    for index, name in enumerate(sr.Microphone.list_microphone_names()):
-        print(f'{index}, {name}')
+    p = pyaudio.PyAudio()
+    info = p.get_host_api_info_by_index(0)
+    numdevices = info.get('deviceCount')
+
+    for i in range(0, numdevices):
+        if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+            print("Input Device id ", i, " - ", p.get_device_info_by_host_api_device_index(0, i).get('name'))
 
 
 def list_cameras():
@@ -513,7 +535,40 @@ def list_cameras():
 
 
 if __name__ == "__main__":
-    # list_microphones()
-    # list_cameras()
+    #list_microphones()
+    list_cameras()
     app = SquatCounterApp()
     app.start()
+    # Open the microphone stream
+
+    #model_path = "vosk-model-en-us-0.42-gigaspeech"
+    # Initialize the model with model-path
+
+    #model = Model(model_path)
+    #rec = KaldiRecognizer(model, 16000)
+    #p = pyaudio.PyAudio()
+    #stream = p.open(format=pyaudio.paInt16,
+    #                channels=1,
+    #                rate=16000,
+    #                input=True,
+    #                frames_per_buffer=8192,
+    #                input_device_index=3)
+    #print("Listening...")
+    #recognized_text = 0
+    #while True:
+    #    data = stream.read(4096)  # read in chunks of 4096 bytes
+    #    if rec.AcceptWaveform(data):  # accept waveform of input voice
+    #        # Parse the JSON result and get the recognized text
+    #        result = json.loads(rec.Result())
+    #        recognized_text = result['text']
+    #        print(f"Recognized text: \"{recognized_text}\"")
+#
+    #    if recognized_text != 0 and "terminate" in recognized_text.lower():
+    #        print("Termination keyword detected. Stopping...")
+    #        break
+#
+    #stream.stop_stream()
+    #stream.close()
+#
+    ## Terminate the PyAudio object
+    #p.terminate()
