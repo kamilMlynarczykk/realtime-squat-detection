@@ -306,7 +306,6 @@ class SquatCounterApp:
         elif h2 > h1:
             img1 = cv2.resize(img1, (int(w1 * h2 / h1), h2))
 
-        # print(img1.shape[:2])
         return np.concatenate((img1, img2), axis=1)
 
     def draw_top_rectangle(self, image, rect_height):
@@ -323,14 +322,13 @@ class SquatCounterApp:
 
     def listen_for_command(self):
         recognizer = sr.Recognizer()
-        #try:
-        #    # Initialize the microphone
-        #    microphone_source = sr.Microphone(microphone)
-        #    print(f"Microphone initialized with index")
-        #except Exception as e:
-        #    print(f"Error initializing microphone: {e}")
-        #    return
-        microphone_source = sr.Microphone(microphone)
+        try:
+            # Initialize the microphone
+            microphone_source = sr.Microphone(microphone)
+            print(f"Microphone initialized with index")
+        except Exception as e:
+            print(f"Error initializing microphone: {e}")
+            return
 
         while True:
             try:
@@ -402,7 +400,6 @@ class SquatCounterApp:
 
     def count_repetition(self, image, left_knee_angle, right_knee_angle):
         # If both knees are extended above 160 degrees, the user is standing ("up" position)
-
         if left_knee_angle > 160 and right_knee_angle > 160:
             self.stage = "up"
             self.frames_below_90 = 0
@@ -479,7 +476,7 @@ class SquatCounterApp:
         a2 = self.calculate_linear_function(right_heel, right_foot_index)
         return np.fabs(a1 - a2) < 0.3
 
-    # used to check if arms are parallel to feet
+    # calculated in order to check if arms are parallel to feet
     def calculate_linear_function(self, one_point, second_point):
         x1, y1 = one_point[:2]
         x2, y2 = second_point[:2]
