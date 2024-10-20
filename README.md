@@ -2,6 +2,7 @@
 # Automatic Squat Counting with Voice Commands
 
 This project uses Python libraries to create an application that counts squats using computer vision and voice recognition.
+Video presentation: https://www.youtube.com/watch?v=xwIthFmOHv0
 
 ## Features
 - Counts squats using body pose estimation from two camera angles (front and side).
