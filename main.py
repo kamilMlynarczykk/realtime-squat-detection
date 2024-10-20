@@ -208,10 +208,10 @@ class SquatCounterApp:
                     cv2.putText(front_image, "Ensure full body is visible", (90, 100),
                                 cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), line_thickness, cv2.LINE_AA)
                 elif self.side_visible and self.countdown <= 0 and not self.listening_for_start:
-                    left_knee_angle, right_knee_angle = self.calculateKneesAngle(landmarks)
+                    left_knee_angle, right_knee_angle = self.calculate_knee_angle(landmarks)
                     self.display_up_down_text(front_image, left_knee_angle, right_knee_angle)
                     self.display_knee_angles(front_image, left_knee_angle, right_knee_angle)
-                    self.countRepetition(front_image, left_knee_angle, right_knee_angle)
+                    self.count_repetition(front_image, left_knee_angle, right_knee_angle)
         except Exception as e:
             cv2.putText(front_image, "Ensure full body is visible", (90, 100),
                         cv2.FONT_HERSHEY_DUPLEX, 1, (0, 0, 255), line_thickness, cv2.LINE_AA)
@@ -384,7 +384,7 @@ class SquatCounterApp:
         print("Starting workout...")
         self.start()  # Start the workout again
 
-    def calculateKneesAngle(self, landmarks):
+    def calculate_knee_angle(self, landmarks):
         points = {
             'left': [mp_pose.PoseLandmark.LEFT_HIP, mp_pose.PoseLandmark.LEFT_KNEE, mp_pose.PoseLandmark.LEFT_ANKLE],
             'right': [mp_pose.PoseLandmark.RIGHT_HIP, mp_pose.PoseLandmark.RIGHT_KNEE, mp_pose.PoseLandmark.RIGHT_ANKLE]
@@ -400,7 +400,7 @@ class SquatCounterApp:
 
         return angles['left'], angles['right']
 
-    def countRepetition(self, image, left_knee_angle, right_knee_angle):
+    def count_repetition(self, image, left_knee_angle, right_knee_angle):
         # If both knees are extended above 160 degrees, the user is standing ("up" position)
 
         if left_knee_angle > 160 and right_knee_angle > 160:
@@ -479,6 +479,7 @@ class SquatCounterApp:
         a2 = self.calculate_linear_function(right_heel, right_foot_index)
         return np.fabs(a1 - a2) < 0.3
 
+    # used to check if arms are parallel to feet
     def calculate_linear_function(self, one_point, second_point):
         x1, y1 = one_point[:2]
         x2, y2 = second_point[:2]
